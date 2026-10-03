@@ -33,7 +33,7 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid #98ffcf;
+  outline: 2px solid #d9eaff;
   outline-offset: 4px;
 }
 button {
@@ -146,11 +146,11 @@ button {
   display: flex;
   align-items: center;
   padding: 110px 6vw 90px;
-  background: linear-gradient(90deg, #19363d65, transparent 70%);
+  background: linear-gradient(90deg, #29425a35, transparent 70%);
 }
 .game-menu {
   width: 390px;
-  background: #132e32ec;
+  background: #193454ed;
   backdrop-filter: blur(15px);
   padding: 28px;
   border: 1px solid #e4f1dc24;
@@ -168,7 +168,7 @@ button {
 .eyebrow {
   font-size: 9px;
   letter-spacing: 1.6px;
-  color: #a8d3c0;
+  color: #bcd7f4;
   font-weight: 600;
 }
 h1,
@@ -411,21 +411,21 @@ kbd {
   gap: 8px;
 }
 .level-grid button {
-  background: #234239;
+  background: #243f5a;
   border: 1px solid #c0e0c81c;
   border-radius: 7px;
   padding: 12px;
   text-align: left;
 }
 .level-grid button.selected {
-  border-color: #b5edc5;
-  background: #355848;
+  border-color: #cee5ff;
+  background: #365c87;
 }
 .level-grid button > span {
   display: flex;
   justify-content: space-between;
   font: 500 16px "Space Grotesk Variable";
-  color: #a2e0b8;
+  color: #bfdbfe;
 }
 .level-grid strong {
   display: block;
@@ -435,7 +435,7 @@ kbd {
 .level-grid small {
   display: block;
   font-size: 9px;
-  color: #a8c4b4;
+  color: #b6cde4;
   margin-top: 5px;
 }
 .setting {
@@ -449,17 +449,17 @@ kbd {
   font-size: 11px;
 }
 .setting > span {
-  color: #a1cbb2;
+  color: #b1d2f3;
 }
 .setting input[type="range"] {
   width: 100%;
   height: 4px;
-  accent-color: #b7f2c8;
+  accent-color: #dbeafe;
 }
 .setting select {
   max-width: 200px;
   border: 1px solid #dbeed32d;
-  background: #254539;
+  background: #294764;
   padding: 7px;
   border-radius: 5px;
   font-size: 10px;
@@ -473,18 +473,18 @@ kbd {
   border-top: 1px solid #dbeed31a;
 }
 .toggle input {
-  accent-color: #b7f2c8;
+  accent-color: #dbeafe;
   width: 15px;
   height: 15px;
 }
 .ability-explanation {
   font-size: 11px;
   line-height: 2;
-  color: #c6d9cd;
+  color: #c6d6e8;
 }
 .unlock-note {
   font-size: 10px;
-  color: #95b8a1;
+  color: #a8c2de;
   line-height: 1.8;
   display: block;
 }
@@ -667,8 +667,8 @@ kbd {
 .touch-buttons .touch-jump {
   width: 85px;
   height: 85px;
-  background: #b8ebc9cf;
-  color: #163e31;
+  background: #d9eaffcf;
+  color: #233e5e;
   font-size: 12px;
 }
 .touch-guide {
@@ -698,4 +698,159 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: 4px;
+}
+
+/* The first-person scene is the opening screen and the playing surface. */
+.scene-view .identity,
+.scene-view .vignette {
+  display: none;
+}
+.scene-view .hud {
+  justify-content: flex-end;
+  top: 24px;
+  right: 24px;
+}
+.scene-view .timer {
+  font-size: 13px;
+  font-weight: 400;
+  min-width: 72px;
+  opacity: 0.8;
+}
+.scene-view .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 3px;
+  background: #24487935;
+}
+.level-banner {
+  position: absolute;
+  top: clamp(38px, 10.3vh, 112px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(220px, 28vw, 535px);
+  padding: 0 12px 3px;
+  background: #2c5196df;
+  border-left: 9px solid #f4f6f8e6;
+  border-right: 9px solid #f4f6f8e6;
+  color: #fff;
+  font:
+    200 clamp(27px, 3.3vw, 63px)/1.12 "Inter Variable",
+    sans-serif;
+  text-align: center;
+  letter-spacing: -1.5px;
+  pointer-events: none;
+  text-shadow: 1px 2px 2px #182f5850;
+}
+.start-prompt {
+  position: absolute;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(410px, calc(100% - 36px));
+  padding: 18px 24px 8px;
+  background: #243b5bd4;
+  border: 1px solid #ffffff38;
+  border-radius: 5px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.start-title {
+  font-size: 11px;
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+  color: #eef5ff;
+}
+.start-prompt .primary-button {
+  width: 235px;
+  background: #e9f1fc;
+  color: #25416b;
+  border-radius: 3px;
+}
+.start-controls {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #e0eaff;
+  margin-top: 13px;
+}
+.start-prompt .menu-actions {
+  margin: 8px 0 0;
+  gap: 22px;
+}
+.start-prompt .menu-actions button {
+  color: #ecf3ff;
+}
+.playing-hint {
+  pointer-events: none;
+  background: #294a7352;
+  border-radius: 3px;
+}
+.ability-hud {
+  pointer-events: none;
+  background: #294a7352;
+  padding: 10px;
+  border-radius: 3px;
+}
+.ability-hud small {
+  color: #e4efff;
+}
+.meter i {
+  background: #d9eaff;
+}
+.hint-dot {
+  background: #eff5ff;
+}
+.joystick,
+.touch-buttons button {
+  background: #2e528363;
+}
+.touch-buttons .touch-jump {
+  background: #e7f0fada;
+  color: #233e5e;
+}
+@media (max-width: 700px) {
+  .scene-view .hud {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+  }
+  .scene-view .timer {
+    font-size: 11px;
+    min-width: 62px;
+    margin: 0;
+  }
+  .scene-view .hud-right {
+    gap: 5px;
+  }
+  .level-banner {
+    top: 64px;
+    width: 230px;
+    font-size: 30px;
+    border-width: 6px;
+  }
+  .start-prompt {
+    padding: 14px 16px 7px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+@media (max-height: 500px) {
+  .level-banner {
+    top: 25px;
+    width: 240px;
+    font-size: 31px;
+  }
+  .start-prompt {
+    bottom: 12px;
+    padding: 10px 18px 5px;
+  }
+  .start-title {
+    margin-bottom: 7px;
+  }
+  .start-controls {
+    margin-top: 7px;
+  }
+  .start-prompt .primary-button {
+    padding: 10px 16px;
+  }
 }

@@ -24,7 +24,7 @@ export class Input {
   private ability = false;
   private utility = false;
   yaw = 0;
-  pitch = -0.12;
+  pitch = 0.035;
   sensitivity = 0.0022;
   private enabled = false;
   private touchX = 0;
@@ -131,7 +131,7 @@ export class Input {
   }
   resetLook() {
     this.yaw = 0;
-    this.pitch = -0.12;
+    this.pitch = 0.035;
     this.clear();
   }
   sample(): Controls {

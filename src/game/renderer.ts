@@ -23,7 +23,16 @@ export class GameRenderer {
   private currentRotation = new THREE.Quaternion();
   private scale = v(1, 1, 1);
   private eyeOffset = v(0, MOVEMENT.eyeHeight - MOVEMENT.height / 2);
-  private sunOffset = v(-50, 100, 35);
+  private sunOffset = v(-75, 55, 35);
+  private sky!: THREE.Mesh;
+  private glow!: THREE.Sprite;
+  private groundShadows!: THREE.InstancedMesh;
+  private shadowMatrix = new THREE.Matrix4();
+  private shadowPosition = v();
+  private shadowRotation = new THREE.Quaternion();
+  private shadowScale = v(1, 1, 1);
+  private up = v(0, 1, 0);
+  private forward = v();
   private sunTargetOffset = v(0, -4, -25);
   private software = false;
   private mobile = matchMedia("(pointer: coarse)").matches;
@@ -66,11 +75,11 @@ export class GameRenderer {
     );
     if (this.renderer.domElement.parentElement !== host)
       host.append(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0xd9e6df);
-    this.scene.fog = new THREE.Fog(0xd9e6df, 100, 550);
-    this.scene.add(new THREE.HemisphereLight(0xd6f2ff, 0x96734e, 2.3));
-    const sun = new THREE.DirectionalLight(0xfff2d8, 3.2);
-    sun.position.set(-50, 100, 35);
+    this.scene.background = new THREE.Color(0x80c8eb);
+    this.scene.fog = new THREE.Fog(0xb9edf1, 130, 680);
+    this.scene.add(new THREE.HemisphereLight(0xe4f6ff, 0xc4a353, 2.0));
+    const sun = new THREE.DirectionalLight(0xfff4df, 3.0);
+    sun.position.copy(this.sunOffset);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -65;
@@ -82,6 +91,7 @@ export class GameRenderer {
     sun.name = "sun";
     sun.target.name = "sun-target";
     this.scene.add(sun, sun.target);
+    this.skydome();
     this.environment();
     this.trucks();
     const ropeGeo = new THREE.BufferGeometry().setFromPoints([v(), v()]);
@@ -122,145 +132,87 @@ export class GameRenderer {
     this.scene.add(mesh);
     return mesh;
   }
+  private skydome() {
+    this.sky = new THREE.Mesh(
+      new THREE.SphereGeometry(1000, 24, 16),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          horizon: { value: new THREE.Color(0xc3f4f3) },
+          zenith: { value: new THREE.Color(0x468eda) },
+        },
+        vertexShader: `varying vec2 skyUv; void main() {skyUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);}`,
+        fragmentShader: `uniform vec3 horizon; uniform vec3 zenith; varying vec2 skyUv;
+          void main() {float height = clamp((skyUv.y - 0.48) * 6.5, 0.0, 1.0);
+            gl_FragColor = vec4(mix(horizon, zenith, height), 1.0);
+            #include <colorspace_fragment>
+          }`,
+        side: THREE.BackSide,
+        depthWrite: false,
+      }),
+    );
+    this.sky.renderOrder = -10;
+    this.scene.add(this.sky);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 128;
+    const context = canvas.getContext("2d")!;
+    const glow = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+    glow.addColorStop(0, "rgba(255,255,242,1)");
+    glow.addColorStop(0.15, "rgba(255,255,240,.95)");
+    glow.addColorStop(0.36, "rgba(255,250,219,.25)");
+    glow.addColorStop(1, "rgba(255,250,219,0)");
+    context.fillStyle = glow;
+    context.fillRect(0, 0, 128, 128);
+    this.glow = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        fog: false,
+      }),
+    );
+    this.glow.scale.set(120, 120, 1);
+    this.scene.add(this.glow);
+  }
   private environment() {
     const l = this.sim.level;
     for (const [front, back] of floorSegments(l)) {
       this.box(320, 0.5, back - front, l.color, 0, -0.25, (front + back) / 2);
     }
-    // Clip road ribbons at physical gaps; pool lane markings into one draw call.
-    const positions: number[] = [],
-      indices: number[] = [],
-      marks: THREE.Matrix4[] = [];
-    for (const route of l.routes)
-      for (let i = 1; i < route.length; i++) {
-        const a = route[i - 1],
-          b = route[i],
-          dx = b.x - a.x,
-          dz = b.z - a.z,
-          length = Math.hypot(dx, dz),
-          rx = ((-dz / length) * l.roadWidth) / 2,
-          rz = ((dx / length) * l.roadWidth) / 2;
-        let spans: [number, number][] = [[0, 1]];
-        for (const [front, end] of l.gaps) {
-          const entry = (end - a.z) / dz,
-            exit = (front - a.z) / dz;
-          if (dz === 0) continue;
-          spans = spans.flatMap(([lo, hi]) => {
-            if (exit <= lo || entry >= hi)
-              return [[lo, hi] as [number, number]];
-            const out: [number, number][] = [];
-            if (entry > lo) out.push([lo, entry]);
-            if (exit < hi) out.push([exit, hi]);
-            return out;
-          });
-        }
-        for (const [lo, hi] of spans) {
-          const n = positions.length / 3;
-          for (const [t, side] of [
-            [lo, -1],
-            [lo, 1],
-            [hi, -1],
-            [hi, 1],
-          ])
-            positions.push(
-              a.x + dx * t + rx * side,
-              0.02,
-              a.z + dz * t + rz * side,
-            );
-          indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2);
-        }
-        for (let t = 8; t < length; t += 16) {
-          const z = a.z + (dz * t) / length;
-          if (l.gaps.some(([front, end]) => z < end + 3 && z > front - 3))
-            continue;
-          marks.push(
-            new THREE.Matrix4().compose(
-              v(a.x + (dx * t) / length, 0.035, z),
-              new THREE.Quaternion().setFromAxisAngle(
-                v(0, 1, 0),
-                Math.atan2(dx, dz),
-              ),
-              v(1, 1, 1),
-            ),
-          );
-        }
-      }
-    if (l.crossConvoy) {
-      const n = positions.length / 3;
-      positions.push(
-        -140,
-        0.0225,
-        -156,
-        140,
-        0.0225,
-        -156,
-        -140,
-        0.0225,
-        -174,
-        140,
-        0.0225,
-        -174,
-      );
-      indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2);
-      for (let x = -130; x < 140; x += 16)
-        marks.push(
-          new THREE.Matrix4().compose(
-            v(x, 0.04, -165),
-            new THREE.Quaternion().setFromAxisAngle(v(0, 1, 0), Math.PI / 2),
-            v(1, 1, 1),
-          ),
-        );
-    }
-    const roadGeo = new THREE.BufferGeometry();
-    roadGeo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
-    );
-    roadGeo.setIndex(indices);
-    roadGeo.computeVertexNormals();
-    const road = new THREE.Mesh(roadGeo, this.material(0x525c59));
-    road.receiveShadow = true;
-    this.scene.add(road);
-    const stripes = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.16, 0.015, 5),
-      this.material(0xe9dabb),
-      marks.length,
-    );
-    marks.forEach((m, i) => stripes.setMatrixAt(i, m));
-    stripes.receiveShadow = true;
-    this.scene.add(stripes);
+    // Broad, faceted dunes frame the course. The drivable sand remains flat.
     let seed = l.seed;
     const rand = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
     };
-    const rocks = new THREE.InstancedMesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      this.material(0xbf8e68),
-      100,
+    const dunes = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 6),
+      this.material(0xffd24a),
+      24,
     );
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 24; i++) {
+      const height = 38 + rand() * 35;
       dummy.position.set(
-        (i % 2 ? -1 : 1) * (45 + rand() * 100),
-        rand() * 2,
-        -rand() * (l.length + 120),
+        (i % 2 ? -1 : 1) * (310 + rand() * 90),
+        height / 2 - 0.4,
+        170 - Math.floor(i / 2) * 135,
       );
-      dummy.scale.set(3 + rand() * 10, 3 + rand() * 15, 4 + rand() * 9);
-      dummy.rotation.set(rand(), rand() * 6, rand());
+      dummy.scale.set(140 + rand() * 35, height, 190 + rand() * 90);
+      dummy.rotation.set(0, rand() * Math.PI, 0);
       dummy.updateMatrix();
-      rocks.setMatrixAt(i, dummy.matrix);
+      dunes.setMatrixAt(i, dummy.matrix);
     }
-    rocks.castShadow = true;
-    rocks.receiveShadow = true;
-    this.scene.add(rocks);
+    dunes.receiveShadow = true;
+    this.scene.add(dunes);
     for (const o of this.sim.obstacles) {
       const d = o.definition;
       const mesh = this.box(
         d.width,
         d.height,
         d.depth,
-        d.type === "ramp" ? 0xbe7847 : d.type === "laser" ? 0xff463d : 0xbd6a49,
+        d.type === "ramp" ? 0xe4bc58 : d.type === "laser" ? 0xff463d : 0xc48353,
         d.x,
         d.y,
         d.z,
@@ -277,17 +229,17 @@ export class GameRenderer {
         this.box(l.roadWidth, 0.15, 0.7, 0xef7848, 0, 0.11, z);
     }
     for (const x of [l.finishX - 11, l.finishX + 11]) {
-      this.box(0.5, 10, 0.6, 0x245d52, x, 5, -l.length);
-      this.box(1.1, 0.6, 1.2, 0x67ffc6, x, 10, -l.length);
+      this.box(0.5, 10, 0.6, 0x855b65, x, 5, -l.length);
+      this.box(1.1, 0.6, 1.2, 0xffdce3, x, 10, -l.length);
     }
-    const banner = this.box(22, 1.2, 0.4, 0x163f39, l.finishX, 9.3, -l.length);
+    const banner = this.box(22, 1.2, 0.4, 0xac596c, l.finishX, 9.3, -l.length);
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
     canvas.height = 128;
     const c = canvas.getContext("2d")!;
-    c.fillStyle = "#163f39";
+    c.fillStyle = "#ac596c";
     c.fillRect(0, 0, 1024, 128);
-    c.fillStyle = "#a3ffe0";
+    c.fillStyle = "#ffffff";
     c.font = "bold 70px sans-serif";
     c.textAlign = "center";
     c.fillText("FINISH", 512, 92);
@@ -295,12 +247,12 @@ export class GameRenderer {
     banner.material = this.material(0xffffff);
     (banner.material as THREE.MeshStandardMaterial).map = texture;
     // Physical first-truck diversion is deliberately before the finish.
-    this.box(5, 2.5, 0.2, 0x244942, l.startX + 8, 4, -95);
+    this.box(5, 2.5, 0.2, 0x415d84, l.startX + 8, 4, -95);
     const hintCanvas = document.createElement("canvas");
     hintCanvas.width = 512;
     hintCanvas.height = 256;
     const hc = hintCanvas.getContext("2d")!;
-    hc.fillStyle = "#244942";
+    hc.fillStyle = "#415d84";
     hc.fillRect(0, 0, 512, 256);
     hc.fillStyle = "#fff8e5";
     hc.textAlign = "center";
@@ -334,13 +286,6 @@ export class GameRenderer {
       mesh.receiveShadow = true;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
-      if (z === 2 && h === 3.1) {
-        for (let i = 0; i < count; i++)
-          mesh.setColorAt(
-            i,
-            new THREE.Color([0xf4e7ce, 0x579b95, 0xe6a868, 0x98b3ad][i % 4]),
-          );
-      }
       this.scene.add(mesh);
       this.parts.push({
         mesh,
@@ -349,20 +294,57 @@ export class GameRenderer {
       });
     };
     part(3, 3.1, 11, 0xffffff, 0, 2.45, 2);
-    part(2.9, 2.24, 4, 0xe97849, 0, 1.85, -5.5);
-    part(2.5, 0.88, 0.07, 0x244647, 0, 2.52, -7.54);
-    part(0.06, 0.88, 1.3, 0x244647, -1.46, 2.5, -6.2);
-    part(0.06, 0.88, 1.3, 0x244647, 1.46, 2.5, -6.2);
-    part(3, 0.18, 15, 0x354342, 0, 1, -0.1);
-    part(2.8, 0.36, 0.16, 0x788b86, 0, 1.25, -7.58);
+    part(2.9, 2.24, 4, 0xf5f7f8, 0, 1.85, -5.5);
+    part(2.5, 0.88, 0.07, 0x405568, 0, 2.52, -7.54);
+    part(0.06, 0.88, 1.3, 0x405568, -1.46, 2.5, -6.2);
+    part(0.06, 0.88, 1.3, 0x405568, 1.46, 2.5, -6.2);
+    part(3, 0.18, 15, 0x303942, 0, 1, -0.1);
+    part(2.8, 0.36, 0.16, 0x83949f, 0, 1.25, -7.58);
     for (const x of [-1, 1]) part(0.4, 0.25, 0.09, 0xffebbb, x, 1.82, -7.55);
-    part(2.8, 0.12, 10.5, 0xfef5dc, 0, 4.025, 2);
-    for (const x of [-1.3, 1.3]) part(0.07, 0.025, 10.5, 0x447a6c, x, 4.09, 2);
-    part(2.8, 0.08, 0.12, 0xec744b, 0, 4.09, -3.24);
+    part(2.8, 0.12, 10.5, 0xffffff, 0, 4.025, 2);
+    for (const x of [-1.3, 1.3]) part(0.07, 0.025, 10.5, 0x667984, x, 4.09, 2);
+    part(2.8, 0.08, 0.12, 0x667984, 0, 4.09, -3.24);
+    part(2.8, 0.08, 0.12, 0x667984, 0, 4.09, 7.24);
+    // Separate rear doors, silver frame, central seam and locking bars.
+    part(2.75, 2.72, 0.08, 0x526675, 0, 2.42, 7.54);
+    for (const x of [-1.43, 0, 1.43])
+      part(0.07, 2.95, 0.12, 0x9eafb8, x, 2.42, 7.6);
+    for (const y of [0.95, 3.9]) part(2.93, 0.09, 0.12, 0x9eafb8, 0, y, 7.6);
+    for (const x of [-0.87, 0.87])
+      part(0.035, 2.52, 0.06, 0x90a0ab, x, 2.42, 7.62);
+    part(2.95, 0.21, 0.24, 0x44515c, 0, 0.87, 7.58);
     for (const x of [-1.38, 1.38])
       for (const z of [-5.5, 0.2, 5.8])
-        part(0, 0, 0, 0x23332f, x, 0.67, z, true);
-    for (const x of [-1.1, 1.1]) part(0.3, 0.25, 0.08, 0xb13526, x, 1.26, 7.55);
+        part(0, 0, 0, 0x171e24, x, 0.67, z, true);
+    for (const x of [-1.1, 1.1]) part(0.3, 0.25, 0.08, 0xb13526, x, 1.26, 7.65);
+    // One inexpensive draw call keeps grounded truck shadows on mobile/Low.
+    // Hardware High/Auto uses the directional light's real shadow map instead.
+    const shadowGeo = new THREE.BufferGeometry();
+    shadowGeo.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(
+        [
+          -1.5, 0, -7.5, 2.5, 0, -9.5, 6.5, 0, -9.5, 6.5, 0, 5.5, 1.5, 0, 7.5,
+          -1.5, 0, 7.5,
+        ],
+        3,
+      ),
+    );
+    shadowGeo.setIndex([0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5]);
+    this.groundShadows = new THREE.InstancedMesh(
+      shadowGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0x684027,
+        opacity: 0.32,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+      count,
+    );
+    this.groundShadows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.groundShadows.frustumCulled = false;
+    this.scene.add(this.groundShadows);
   }
   update(settings: Settings) {
     const changed =
@@ -452,6 +434,25 @@ export class GameRenderer {
         q = this.truckRotation
           .copy(t.previousRotation)
           .slerp(this.currentRotation.copy(t.body.rotation()), alpha);
+      const onSand =
+        p.y < 5 &&
+        Math.abs(p.x) < 158 &&
+        !this.sim.level.gaps.some(([front, back]) => p.z > front && p.z < back);
+      this.forward.set(0, 0, 1).applyQuaternion(q);
+      this.shadowRotation.setFromAxisAngle(
+        this.up,
+        Math.atan2(this.forward.x, this.forward.z),
+      );
+      this.shadowPosition.set(p.x, 0.045, p.z);
+      this.shadowScale.setScalar(onSand ? 1 : 0);
+      this.groundShadows.setMatrixAt(
+        i,
+        this.shadowMatrix.compose(
+          this.shadowPosition,
+          this.shadowRotation,
+          this.shadowScale,
+        ),
+      );
       const transform = this.matrix.compose(p, q, this.scale);
       for (const part of this.parts)
         part.mesh.setMatrixAt(
@@ -460,6 +461,8 @@ export class GameRenderer {
         );
     }
     for (const p of this.parts) p.mesh.instanceMatrix.needsUpdate = true;
+    this.groundShadows.visible = !this.renderer.shadowMap.enabled;
+    this.groundShadows.instanceMatrix.needsUpdate = true;
     this.sim.obstacles.forEach((o, i) => {
       this.obstacles[i].position.copy(o.body.translation());
       this.obstacles[i].quaternion.copy(o.body.rotation());
@@ -484,6 +487,8 @@ export class GameRenderer {
       this.camera.position.y +=
         Math.sin(age * 35) * 0.025 * Math.exp(-age * 15);
     this.camera.rotation.set(pitch, yaw, 0, "YXZ");
+    this.sky.position.copy(this.camera.position);
+    this.glow.position.copy(this.camera.position).add(v(-220, 480, -700));
     const targetFov =
       this.settings.fov + (sprint && this.settings.sprintFov ? 5 : 0);
     this.camera.fov += (targetFov - this.camera.fov) * 0.12;
@@ -541,8 +546,12 @@ export class GameRenderer {
     this.scene.traverse((o) => {
       if (o instanceof THREE.InstancedMesh) o.dispose();
       if (o instanceof THREE.DirectionalLight) o.shadow.map?.dispose();
-      if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
-        geos.add(o.geometry);
+      if (
+        o instanceof THREE.Mesh ||
+        o instanceof THREE.Line ||
+        o instanceof THREE.Sprite
+      ) {
+        if (!(o instanceof THREE.Sprite)) geos.add(o.geometry);
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
           mats.add(m);
           const map = (m as THREE.MeshStandardMaterial).map;

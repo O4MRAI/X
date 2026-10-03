@@ -136,14 +136,22 @@ describe("first-person moving platform foundation", () => {
 describe("tutorial playability", () => {
   it("can finish level one through an actual truck transfer in basic mode", () => {
     const s = new Simulation(LEVELS[0], { ...DEFAULT_SETTINGS });
-    tick(s, 42, { ...idleInput(), z: -1 });
-    tick(s, 1, { ...idleInput(), z: -1, jump: true });
-    tick(s, 65, { ...idleInput(), z: -1 });
+    tick(s, 26, { ...idleInput(), z: -1, sprint: true });
+    tick(s, 1, { ...idleInput(), z: -1, sprint: true, jump: true });
+    tick(s, 65, { ...idleInput(), z: -1, sprint: true });
     tick(s, 2400);
     expect(s.player.visited.size).toBeGreaterThan(1);
     expect(s.outcome).toBe("completed");
     expect(s.activeTime).toBeGreaterThan(20);
     expect(s.activeTime).toBeLessThan(60);
+    s.dispose();
+  });
+  it("cannot walk across the open gap to the next truck", () => {
+    const s = new Simulation(LEVELS[0], { ...DEFAULT_SETTINGS });
+    tick(s, 180, { ...idleInput(), z: -1, sprint: true });
+    expect(s.outcome).toBe("failed");
+    expect(s.player.visited.size).toBe(1);
+    expect(s.player.jumps).toBe(0);
     s.dispose();
   });
   it("the starter diverts away from the finish instead of granting an idle win", () => {
@@ -187,9 +195,9 @@ describe("movement edge cases and frame rates", () => {
   });
   it("switches support on a faster/slower truck without multiplying momentum", () => {
     const s = new Simulation(LEVELS[2], { ...DEFAULT_SETTINGS });
-    tick(s, 42, { ...idleInput(), z: -1 });
-    tick(s, 1, { ...idleInput(), z: -1, jump: true });
-    tick(s, 65, { ...idleInput(), z: -1 });
+    tick(s, 32, { ...idleInput(), z: -1, sprint: true });
+    tick(s, 1, { ...idleInput(), z: -1, sprint: true, jump: true });
+    tick(s, 65, { ...idleInput(), z: -1, sprint: true });
     tick(s, 10);
     expect(s.outcome).toBeNull();
     expect(s.player.landings).toBe(1);
@@ -225,23 +233,35 @@ describe("authored campaign routes", () => {
     "level $id has a reachable finish using basic movement",
     (level) => {
       const s = new Simulation(level, { ...DEFAULT_SETTINGS });
-      tick(s, 42, { ...idleInput(), z: -1 });
+      tick(s, 32, { ...idleInput(), z: -1, sprint: true });
       tick(s, 1, {
         ...idleInput(),
         z: -1,
-        x: level.id === 9 ? 0.5 : 0,
+        sprint: true,
+        x: level.id === 9 ? 0.65 : 0,
         jump: true,
       });
       tick(s, 65, {
         ...idleInput(),
         z: -1,
-        x: level.id === 9 ? 0.5 : 0,
+        sprint: true,
+        x: level.id === 9 ? 0.65 : 0,
       });
       if (level.id === 6 || level.id === 10) {
-        tick(s, 102);
-        tick(s, 42, { ...idleInput(), z: -1 });
-        tick(s, 1, { ...idleInput(), z: -1, x: -0.5, jump: true });
-        tick(s, 65, { ...idleInput(), z: -1, x: -0.5 });
+        tick(s, level.id === 6 ? 100 : 150);
+        tick(s, level.id === 6 ? 30 : 26, {
+          ...idleInput(),
+          z: -1,
+          sprint: true,
+        });
+        tick(s, 1, {
+          ...idleInput(),
+          z: -1,
+          sprint: true,
+          x: -0.65,
+          jump: true,
+        });
+        tick(s, 65, { ...idleInput(), z: -1, sprint: true, x: -0.65 });
       }
       for (let i = 0; i < 3000 && !s.outcome; i++) {
         const near =

@@ -198,7 +198,7 @@ export class GameEngine {
       landings: p.landings,
       visited: p.visited.size,
       reason: this.sim.reason,
-      look: { yaw: this.input?.yaw ?? 0, pitch: this.input?.pitch ?? -0.12 },
+      look: { yaw: this.input?.yaw ?? 0, pitch: this.input?.pitch ?? 0.035 },
       normal: p.supportNormal.y,
     };
   }
@@ -258,7 +258,7 @@ export class GameEngine {
       this.render.render(
         this.phase === "Playing" ? this.clock.alpha : 1,
         this.input?.yaw ?? 0,
-        this.input?.pitch ?? -0.12,
+        this.input?.pitch ?? 0.035,
         this.pending.sprint && this.phase === "Playing",
       );
       this.lastRender = now;

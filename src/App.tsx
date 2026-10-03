@@ -79,6 +79,7 @@ export default function App() {
   const phase = state?.phase || "Loading",
     level = LEVELS[(state?.level || 1) - 1],
     playing = phase === "Playing",
+    entry = phase === "MainMenu" && panel === "play",
     completed = phase === "Completed",
     failed = phase === "Failed";
   const start = () => {
@@ -101,7 +102,7 @@ export default function App() {
             ? "Grappling hook unlocked"
             : "";
   return (
-    <main className="game-shell">
+    <main className={`game-shell ${playing || entry ? "scene-view" : ""}`}>
       <GameViewport options={options.current} onReady={ready} />
       <div className="vignette" />
       <header className="hud">
@@ -139,42 +140,81 @@ export default function App() {
           )}
         </div>
       </header>
+      {(playing || entry) && (
+        <div className="level-banner" aria-label={`World 1, level ${level.id}`}>
+          LEVEL 1:{level.id}
+        </div>
+      )}
+      {entry && (
+        <section className="start-prompt" aria-label="Game menu">
+          <span className="start-title">CONVOY LEAP</span>
+          <button className="primary-button" onClick={start}>
+            PLAY LEVEL <ArrowRight size={19} />
+          </button>
+          <div className="start-controls">
+            {touch
+              ? "Left stick move · Drag right look · Tap Jump"
+              : "WASD move · Mouse look · Space jump · Shift sprint"}
+          </div>
+          <div className="menu-actions">
+            <button onClick={() => setPanel("levels")}>
+              Levels <ChevronRight size={15} />
+            </button>
+            <button onClick={() => setPanel("loadout")}>
+              Abilities <ChevronRight size={15} />
+            </button>
+            <button
+              onClick={() => setPanel("settings")}
+              aria-label="Game settings"
+            >
+              <Settings2 size={16} />
+            </button>
+          </div>
+          {error && (
+            <div className="error-message" role="alert">
+              {error}
+            </div>
+          )}
+        </section>
+      )}
       {playing && (
         <>
           <TouchControls getEngine={() => engine.current} settings={settings} />
           <div className="crosshair" />
-          <div className="ability-hud">
-            <div>
-              <span>{names[settings.movement]}</span>
-              <small>
-                {settings.movement === "none"
-                  ? "NO ASSIST"
-                  : settings.movement === "double"
-                    ? "SPACE · IN AIR"
-                    : `E · ${state!.cooldown > 0 ? state!.cooldown.toFixed(1) + "s" : "READY"}`}
-              </small>
-            </div>
-            {settings.utility === "slow" && (
-              <div>
-                <span>Slow motion</span>
-                <small>
-                  Q ·{" "}
-                  {state!.scale < 0.8
-                    ? "ACTIVE"
-                    : state!.slow > 0.98
-                      ? "READY"
-                      : "CHARGING"}
-                </small>
-                <div className="meter">
-                  <i style={{ width: `${state!.slow * 100}%` }} />
+          {(settings.movement !== "none" || settings.utility !== "none") && (
+            <div className="ability-hud">
+              {settings.movement !== "none" && (
+                <div>
+                  <span>{names[settings.movement]}</span>
+                  <small>
+                    {settings.movement === "double"
+                      ? "SPACE · IN AIR"
+                      : `E · ${state!.cooldown > 0 ? state!.cooldown.toFixed(1) + "s" : "READY"}`}
+                  </small>
                 </div>
-              </div>
-            )}
-          </div>
-          {settings.hints && (state?.time || 0) < 12 && (
+              )}
+              {settings.utility === "slow" && (
+                <div>
+                  <span>Slow motion</span>
+                  <small>
+                    Q ·{" "}
+                    {state!.scale < 0.8
+                      ? "ACTIVE"
+                      : state!.slow > 0.98
+                        ? "READY"
+                        : "CHARGING"}
+                  </small>
+                  <div className="meter">
+                    <i style={{ width: `${state!.slow * 100}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {settings.hints && (state?.time || 0) < 5 && (
             <div className="playing-hint">
               <span className="hint-dot" />
-              The ground is off limits. Jump to another roof.
+              Sprint toward the edge, then jump to another roof.
               <small>
                 {touch
                   ? "Left stick move · Drag right look · Jump to leap"
@@ -184,7 +224,7 @@ export default function App() {
           )}
         </>
       )}
-      {!playing && (
+      {!playing && !entry && (
         <div className="menu-layer">
           <section
             className={`game-menu ${panel === "levels" ? "wide-menu" : ""}`}
@@ -221,7 +261,9 @@ export default function App() {
                       ? "One more leap."
                       : phase === "Paused"
                         ? "Take a breath."
-                        : "Stay off the ground."}
+                        : phase === "Loading"
+                          ? "Loading game…"
+                          : "Stay off the ground."}
                 </h1>
                 <p className="menu-description">
                   {completed
@@ -230,7 +272,7 @@ export default function App() {
                       ? state?.reason
                       : phase === "Paused"
                         ? "The convoy will wait. Resume when you are ready."
-                        : "Run freely. Jump between moving trucks. Reach the finish."}
+                        : "Sprint, leap between moving trucks, and reach the finish."}
                 </p>
                 <div className="level-strip">
                   <span className="level-number">
@@ -490,7 +532,7 @@ export default function App() {
                     >
                       <option value="auto">Auto</option>
                       <option value="high">High</option>
-                      <option value="low">Low · no shadows</option>
+                      <option value="low">Low · simple shadows</option>
                     </select>
                   </label>
                   {(["shake", "sprintFov", "hints", "debug"] as const).map(
@@ -530,12 +572,6 @@ export default function App() {
               </div>
             )}
           </section>
-          <div className="menu-caption">
-            <span className="caption-line" />
-            <span>
-              NO ROAD. NO SECOND CHANCES.<small>Until you press retry.</small>
-            </span>
-          </div>
         </div>
       )}
       {playing && settings.debug && state && (
@@ -548,12 +584,6 @@ export default function App() {
           {"\n"}transfers {state.landings} · time scale {state.scale.toFixed(2)}
         </pre>
       )}
-      <footer className="game-footer">
-        <span>
-          CONVOY LEAP <i>/</i> DESERT WORLD
-        </span>
-        <span>{String(level.id).padStart(2, "0")} / 10</span>
-      </footer>
     </main>
   );
 }

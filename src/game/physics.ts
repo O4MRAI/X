@@ -112,7 +112,7 @@ export class Simulation {
         const row = i - (level.truckCount - 6),
           direction = level.crossDirection === "right" ? -1 : 1;
         this.addTruck(
-          direction * (80 + row * 16),
+          direction * (80 + row * level.rowSpacing),
           -165,
           level.speed + 1,
           [
@@ -126,15 +126,19 @@ export class Simulation {
       }
       const column = (i - 1) % 4;
       const row = Math.floor((i - 1) / 4);
-      const x = (column - 1.5) * level.spread;
+      // Stagger the tutorial's outside trucks while keeping its central jump route.
+      const outside = level.id === 1 && (column === 0 || column === 3);
+      const x = level.startX + (column - 2) * level.spread;
+      const stagger = outside ? (column === 0 ? 5 : -4) : 0;
       const speed =
         level.speed + (this.random() - 0.5) * 2 * level.speedVariation;
       this.addTruck(
         x,
-        -8 - row * (16 + (level.id === 2 ? 2 : 0)),
+        8 - (row + 1) * level.rowSpacing + stagger,
         speed,
         level.routes[column % level.routes.length],
         x,
+        outside ? (column === 0 ? 0.09 : -0.09) : 0,
       );
     }
     this.world.step();

@@ -28,6 +28,7 @@ export type Level = {
   finishY: number;
   startX: number;
   spread: number;
+  rowSpacing: number;
   speedVariation: number;
   crossConvoy?: boolean;
   crossDirection?: "left" | "right";
@@ -53,11 +54,12 @@ const base = (
   routes: [straight(overrides.length ?? 440)],
   obstacles: [],
   gaps: [],
-  color: 0xe5bd87,
+  color: 0xffca22,
   finishX: 0,
   finishY: 4,
   startX: 2,
-  spread: 4,
+  spread: 7,
+  rowSpacing: 22,
   speedVariation: 0.5,
   ...overrides,
 });
@@ -67,7 +69,8 @@ export const LEVELS: Level[] = [
     speedVariation: 0.2,
   }),
   base(2, "Open water", "Wider spacing. Commit to the jump.", {
-    spread: 5,
+    spread: 9,
+    rowSpacing: 24,
     length: 470,
     speed: 19,
   }),
@@ -130,7 +133,7 @@ export const LEVELS: Level[] = [
         width: 26,
         height: 8,
         depth: 0.6,
-        period: 5,
+        period: 4.5,
       },
       {
         type: "barrier",
@@ -210,7 +213,7 @@ export const LEVELS: Level[] = [
       },
     ],
     gaps: [[-383, -371]],
-    color: 0xdca87b,
+    color: 0xf4ce59,
   }),
 ];
 export function floorSegments(level: Level) {

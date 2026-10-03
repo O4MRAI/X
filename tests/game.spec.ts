@@ -9,13 +9,14 @@ async function loaded(page: Page, url = "./") {
 }
 async function walkToEdge(page: Page) {
   const start = (await snapshot(page))!.simulationTime;
+  await page.keyboard.down("Shift");
   await page.keyboard.down("w");
   await expect
     .poll(async () => (await snapshot(page))!.simulationTime - start, {
       intervals: [20],
       timeout: 10000,
     })
-    .toBeGreaterThan(0.65);
+    .toBeGreaterThan(0.4);
 }
 test("real keyboard transfer, paused clocks, real finish, and persistent unlock", async ({
   page,
@@ -38,6 +39,7 @@ test("real keyboard transfer, paused clocks, real finish, and persistent unlock"
     })
     .toBeGreaterThan(1);
   await page.keyboard.up("w");
+  await page.keyboard.up("Shift");
   expect((await snapshot(page))!.landings).toBeGreaterThan(0);
   await page.screenshot({ path: "/tmp/convoy-playing.png" });
   await page.keyboard.press("Escape");
