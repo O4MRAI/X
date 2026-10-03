@@ -1,22 +1,52 @@
-# Rooftop Rush
+# CONVOY LEAP
 
-A React + TypeScript 3D endless runner for desktop browsers and Android Chrome. Run forward automatically, jump between moving truck roofs, collect gems, and stay off the road. A fall onto the asphalt or a collision with a truck's side ends the run.
+A playable first-person truck platformer built with React, TypeScript, Vite, Three.js, and Rapier 3D. It opens directly into a full-screen 3D game with a compact in-game play menu. Move freely, jump between dynamic semi-trucks, and physically enter a finish gate. The road, lethal obstacles, and fast truck strikes end the attempt.
 
-## Develop
+This release contains **10 authored desert levels**, not the proposed 90-level campaign. Models, layouts, shaders, and synthesized sounds are original. No backend, accounts, external model URLs, or AI-controlled vehicles are needed.
 
-Node.js 22.12+ (the prepared environment uses Node 24) and npm are required.
+## Run
+
+Use Node 22.12+ (Node 24 in this environment).
 
 ```sh
-cd /workspace/X
-npm ci
-npm run dev -- --port 5173
+npm ci --include=dev
+npm run dev -- --port 5173 --strictPort
 ```
 
-Vite listens on all interfaces so a phone on a reachable network can test the game. Desktop controls: **A / D** or **left / right arrows** to steer, **Space / W / up arrow** to jump, **Escape** to pause, and **R** to restart after a crash. Touch controls: hold the left/right buttons and tap **Jump**. You can steer in midair. Jump near the front edge of a roof when the green cue appears.
+Open `http://localhost:5173/`. Click **Play level** to capture the mouse and activate audio. Desktop Chrome is the primary tested browser. On touch devices, use the left joystick, drag the right side to look, tap Jump, and hold Sprint; landscape is recommended. The mobile controls were checked with Android-sized Chromium emulation, not physical Android hardware. This is a browser/PWA game, not an APK.
 
-Select Nova, Dash, or Pixel in the lobby. Settings offer optional sound, a slower Chill mode, automatic graphics quality, high quality, and a battery saver. Best distance, score, run count, gems, and preferences are stored locally on the current device. No account or backend is required.
+| Input | Action |
+| --- | --- |
+| WASD / mouse | Move / look |
+| Space | Jump; press again for an equipped double jump |
+| Shift | Sprint |
+| E | Equipped dash or grapple |
+| Q | Equipped slow motion |
+| R | Instant retry while playing |
+| Escape | Pause and release the mouse |
 
-## Verify and build
+Lost mouse capture, tab visibility changes, and window blur pause the simulation. Resume requires a click. Failed runs have an immediate Retry button. Progress, best active-play times, settings, and unlocks persist locally; malformed or inaccessible storage falls back safely.
+
+## Levels and equipment
+
+| Level | Feature |
+| --- | --- |
+| 01 — The first leap | Tutorial transfer; the starter diverts before the finish |
+| 02 — Open water | Wider convoy spacing |
+| 03 — Passing lane | Different truck speeds |
+| 04 — The long bend | A steering turn |
+| 05 — Bottle neck | A narrow collision corridor |
+| 06 — Cross traffic | Intersecting dynamic convoys; multiple transfers |
+| 07 — Air freight | Ramp, airborne trucks, and a road gap |
+| 08 — Red light | Timed lethal laser and moving barrier |
+| 09 — Split decision | A tight shortcut and a wider detour |
+| 10 — Convoy leap | Turns, cross traffic, ramp, gap, and barrier |
+
+Basic movement is always selectable. Finishing 01 unlocks Double Jump, 02 unlocks Slow Motion, 04 unlocks Dash, and 06 unlocks Grapple. Equip them in the in-game Abilities panel. Grapple casts a 36m line-of-sight ray to a truck, draws a rope, and applies acceleration for a bounded duration. Dash adds a horizontal impulse with a cooldown. Neither teleports the player.
+
+Sensitivity, FOV (default 65°), volume/mute, graphics quality, optional landing shake, sprint FOV, hints, and collider diagnostics are available in Settings. Debug mode shows actual Rapier colliders, velocity, support, normal, FPS, draw calls, body count, transfers, and time scale.
+
+## Validation
 
 ```sh
 npm test
@@ -24,42 +54,44 @@ npm run build
 npm run test:browser
 ```
 
-The nine physics tests cover deterministic generation, jumping across gaps, double-jump prevention, midair steering, road and side impacts, gem collection, a minute of simulated continuous play, and freezing a completed run. Five Playwright checks cover lobby interactions and persistent preferences; a real browser jump across a gap, pause/resume and restart; Android-sized touch screens in both orientations; offline production play; and unavailable WebGL.
+The **35 simulation/save checks** cover ten-second roof carry, turning support, exactly-once momentum inheritance, different-speed landings, diagonal normalization, coyote time, jump buffering, side contact, limited air jumps, physical ground/finish triggers, twenty world resets, fixed-step agreement at 30/60/144 rendering Hz, slow motion, dash, grapple and blocked line of sight, airborne/overturned vehicles, impulse response, corruption recovery, and unlocks. All ten levels have deterministic finish-reaching input sequences using basic movement and actual transfers, with no teleporting in those playthroughs. These establish reachable routes, not exhaustive collision or difficulty guarantees.
 
-Browser tests use `/usr/bin/chromium` in the prepared cloud environment. Set `CHROMIUM_PATH` to another Chromium executable if needed. Build before running browser tests: they start the production preview alongside the development server to test offline behavior.
+Playwright checks real keyboard tutorial completion and saved unlocks; pause/resume; twenty immediate retries and bounded GPU/body resources; settings and mouse capture; touch play in portrait/landscape; production offline play; pointer-lock rejection; and unavailable WebGL. Its development-only `window.__CONVOY__()` reads diagnostics and has no gameplay mutation methods. The production build omits that hook.
+
+Browser tests use `/usr/bin/chromium`; override `CHROMIUM_PATH` if needed. They start/reuse Vite on 5173 and the production preview on 4173. Build before running them. Screenshots are written to `/tmp/convoy-*.png`.
+
+The cloud tests use **Chromium's SwiftShader software GPU**, not a desktop or Android GPU. The final automated tutorial showed approximately **21 FPS near the finish** at a 1440×1000 viewport with Auto software graphics rendering at 720×500. This is the smoothed HUD readout, not a sustained benchmark; the 60 FPS target was not achieved on this machine. Tutorial browser completion took about 26 active seconds, and the deterministic campaign routes take about 21–28 simulation seconds. Hardware acceleration is recommended. Physical-device profiling and additional browser engines remain to be done.
+
+## Physics and performance
+
+- Simulation runs at 60 Hz with interpolation and a six-step catch-up limit after stalls. Active-play time drives ability durations/cooldowns and records; simulation time drives vehicle motion and obstacles. Paused/menu time advances neither. Slow motion scales all simulation bodies together.
+- An upright swept capsule moves independently of the trucks. Support stores a contact point in the truck's local coordinates, carries its translation/rotation, and inherits `linear velocity + angular velocity × contact offset` once on takeoff. The camera is independent of truck roll/pitch. Landing requires an upward surface normal; sides do not grant jumps.
+- Trucks are dynamic, CCD-enabled Rapier bodies with trailer/cab/wheel colliders. Steering uses forces and torques, with propulsion and mild stability assistance restricted to upright trucks close to the ground. Collisions can deflect, topple, and pile them up. The support vehicle is never recycled away.
+- Truck parts, rocks, and road markings use instancing; geometry/materials are shared within a scene. Counts are finite (25–33 trucks). Retry preserves the canvas, mouse capture, and WebGL context while freeing old worlds, event queues, controllers, instance buffers, textures, and sounds.
+- Auto graphics uses lighter diffuse lighting, disables shadows and lowers resolution for software rendering and touch devices, and reduces quality after sustained low frame rates on hardware. High uses standard materials; changing modes applies immediately. High/Low are explicit overrides. Frozen scenes render at 10 Hz; the HUD updates at about 10 Hz. The initial physics chunk is approximately 830 KB gzip because Rapier compatibility includes its WebAssembly payload.
+
+## Project map
+
+`src/game/config.ts` contains movement and ability constants. `physics.ts` owns worlds, truck dynamics, obstacles, and outcomes; `player.ts` owns support and swept movement. `clock.ts`, `input.ts`, `renderer.ts`, `audio.ts`, and `save.ts` handle their respective systems. `engine.ts` coordinates explicit game states. `src/App.tsx` provides in-game overlays; `TouchControls.tsx` provides mobile input.
+
+To author another level, add a `Level` in `src/game/levels.ts`, with a distinct seed, routes extending beyond the finish, obstacle dimensions, and matching gaps. Add a normal-input completion sequence to the campaign test and inspect it interactively. Currently progression and menu counts cap at ten; extend those together when actually adding more levels. The remaining worlds and 90-level campaign are future work, not unlocked placeholders.
+
+Run `npm run format` to format source/tests. Fonts are bundled; their licenses are under `public/licenses/`. The previous generated character sheet remains in `public/characters.webp` as an unused retained asset. The first-person build uses programmatic truck/environment models.
+
+## Build and deploy
 
 ```sh
+npm run build
 npm run preview -- --port 4173
 ```
 
-The default build serves from the root of an HTTPS static website. For this repository's GitHub Pages project site, build with the correct prefix:
+For the GitHub Pages project path:
 
 ```sh
 VITE_BASE_PATH=/X/ npm run build
 VITE_BASE_PATH=/X/ npm run test:browser
 ```
 
-The deployment workflow in `.github/workflows/deploy-pages.yml` runs unit tests, builds for `/X/`, uploads the site, and publishes to GitHub Pages whenever `main` changes. In **Repository Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. The expected site address is **https://o4mrai.github.io/X/**. If the first workflow ran before Pages was enabled, rerun **Deploy Rooftop Rush to GitHub Pages** from the Actions tab after enabling it.
+The Actions workflow builds/tests and publishes every push to `main`. Pages is already enabled with GitHub Actions as its publishing source. The account's existing custom-domain configuration redirects `https://o4mrai.github.io/X/` to `http://majarr.me/X/`; it is preserved. This environment's network policy can block direct inspection of the custom domain, independently of successful publishing.
 
-`VITE_BASE_PATH` updates Vite's asset URLs and the offline cache together. The manifest uses relative URLs, and the service worker stays inside its site's path. Run a prefixed preview with the same environment variable. Keep `sw.js` revalidating on deployment rather than caching it indefinitely. Hashed JavaScript and CSS assets can use long cache lifetimes.
-
-## Android and offline use
-
-The production build includes a manifest, home-screen icons, and a service worker. On Android Chrome, open the hosted HTTPS site, allow the first load to finish, then choose **Add to home screen / Install app** in the browser menu. After the game has been cached, it also runs offline. This is an installable web app, not a signed Android APK or Play Store release. Localhost also supports service workers for development; plain HTTP on a remote host does not.
-
-Tested in Chromium with desktop and Android-sized browser emulation, including touch and landscape. Actual Android hardware and other browser engines have not yet been tested. A browser with WebGL2 and hardware acceleration is needed; graphics failures show a reload/help message.
-
-## Implementation
-
-- `src/game/core.ts`: deterministic physics, collision detection, seeded route generation, scoring, and platform recycling, independent of rendering.
-- `src/game/engine.ts`: Three.js scene, fixed 120 Hz simulation steps, interpolated follow camera, animated characters, pooled geometry and materials, instanced trucks / trees / buildings, bounded object counts, capped pixel density, and automatic quality reduction.
-- `src/App.tsx`: React lobby, overlays, character selection, settings, scores, and touch controls. Rendering runs outside React; the HUD updates at about 10 Hz.
-- `scripts/build-sw.mjs`: generates a versioned offline cache from the production assets.
-
-The lobby renders at 30 FPS; pause and result screens reduce rendering further, and hidden pages stop rendering and pause the run. Touch devices disable shadows in Auto mode; High quality enables them. Quality and sound can be changed without restarting the app.
-
-## Artwork
-
-The original character sheet in `public/characters.webp` was generated with the available OpenAI image-generation tool. Higgsfield was requested but was not available in the session. Gameplay uses original lightweight 3D characters inspired by the sheet; it does not load the large source PNG. The original generated PNG remains in `/workspace/generated_images`.
-
-Inter and Space Grotesk are bundled locally. Their font licenses are in `public/licenses/`.
+The generated service worker caches the production build within its path, and a new deployment clears the previous game's cache. Offline/PWA installation requires **HTTPS or localhost**. GitHub currently reports HTTPS enforcement disabled on the inherited domain; remote plain HTTP does not support offline installation. Android Chrome can install the HTTPS-hosted game from its menu after the first cache completes. No Play Store package is included.

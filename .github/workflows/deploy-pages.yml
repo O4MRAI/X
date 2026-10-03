@@ -1,4 +1,4 @@
-name: Deploy Rooftop Rush to GitHub Pages
+name: Deploy Convoy Leap to GitHub Pages
 
 on:
   push:
@@ -18,8 +18,8 @@ jobs:
     env:
       VITE_BASE_PATH: /X/
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: npm

@@ -13,7 +13,7 @@ const assets = (await files('dist')).filter(file => file !== 'sw.js');
 const hash = createHash('sha256').update(base);
 for (const asset of assets) hash.update(asset).update(await readFile(join('dist', asset)));
 const version = hash.digest('hex').slice(0, 12);
-const cachePrefix = `rooftop-rush-${encodeURIComponent(base)}-`;
+const cachePrefix = `convoy-leap-${encodeURIComponent(base)}-`;
 await writeFile('dist/sw.js', `const BASE = ${JSON.stringify(base)};
 const CACHE_PREFIX = ${JSON.stringify(cachePrefix)};
 const CACHE = CACHE_PREFIX + ${JSON.stringify(version)};
@@ -22,7 +22,7 @@ self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => (key.startsWith(CACHE_PREFIX) || key.startsWith('rooftop-rush-' + encodeURIComponent(BASE) + '-')) && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
