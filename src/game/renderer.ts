@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { MOVEMENT, type Settings } from "./config";
+import { MOVEMENT, WORLD, type Settings } from "./config";
 import { type Simulation } from "./physics";
 import { floorSegments } from "./levels";
 import { v } from "./math";
@@ -178,7 +178,15 @@ export class GameRenderer {
   private environment() {
     const l = this.sim.level;
     for (const [front, back] of floorSegments(l)) {
-      this.box(320, 0.5, back - front, l.color, 0, -0.25, (front + back) / 2);
+      this.box(
+        WORLD.halfWidth * 2,
+        0.5,
+        back - front,
+        l.color,
+        0,
+        -0.25,
+        (front + back) / 2,
+      );
     }
     // Broad, faceted dunes frame the course. The drivable sand remains flat.
     let seed = l.seed;
@@ -193,9 +201,9 @@ export class GameRenderer {
     );
     const dummy = new THREE.Object3D();
     for (let i = 0; i < 24; i++) {
-      const height = 38 + rand() * 35;
+      const height = 48 + rand() * 40;
       dummy.position.set(
-        (i % 2 ? -1 : 1) * (310 + rand() * 90),
+        (i % 2 ? -1 : 1) * (400 + rand() * 90),
         height / 2 - 0.4,
         170 - Math.floor(i / 2) * 135,
       );
@@ -436,7 +444,7 @@ export class GameRenderer {
           .slerp(this.currentRotation.copy(t.body.rotation()), alpha);
       const onSand =
         p.y < 5 &&
-        Math.abs(p.x) < 158 &&
+        Math.abs(p.x) < WORLD.halfWidth - 2 &&
         !this.sim.level.gaps.some(([front, back]) => p.z > front && p.z < back);
       this.forward.set(0, 0, 1).applyQuaternion(q);
       this.shadowRotation.setFromAxisAngle(

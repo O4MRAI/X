@@ -3,8 +3,9 @@ import RAPIER, {
   type RigidBody,
 } from "@dimforge/rapier3d-compat";
 import { Quaternion, Vector3 } from "three";
-import { MOVEMENT, type Settings } from "./config";
+import { MOVEMENT, WORLD, type Settings } from "./config";
 import { floorSegments, type Level, type Point, type Obstacle } from "./levels";
+import { createConvoy } from "./convoy";
 import { PlayerController } from "./player";
 import { type Controls } from "./input";
 import { v } from "./math";
@@ -69,9 +70,11 @@ export class Simulation {
         ),
       );
       const collider = this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(160, 0.25, (back - front) / 2).setFriction(
-          0.15,
-        ),
+        RAPIER.ColliderDesc.cuboid(
+          WORLD.halfWidth,
+          0.25,
+          (back - front) / 2,
+        ).setFriction(0.15),
         body,
       );
       this.roles.set(collider.handle, { kind: "ground" });
@@ -107,6 +110,7 @@ export class Simulation {
       { x: 32, z: -235 },
     ];
     this.addTruck(level.startX, 8, level.speed, starterRoute, level.startX);
+    const formation = createConvoy(level);
     for (let i = 1; i < level.truckCount; i++) {
       if (level.crossConvoy && i > level.truckCount - 7) {
         const row = i - (level.truckCount - 6),
@@ -124,21 +128,16 @@ export class Simulation {
         );
         continue;
       }
-      const column = (i - 1) % 4;
-      const row = Math.floor((i - 1) / 4);
-      // Stagger the tutorial's outside trucks while keeping its central jump route.
-      const outside = level.id === 1 && (column === 0 || column === 3);
-      const x = level.startX + (column - 2) * level.spread;
-      const stagger = outside ? (column === 0 ? 5 : -4) : 0;
+      const spawn = formation[i - 1];
       const speed =
         level.speed + (this.random() - 0.5) * 2 * level.speedVariation;
       this.addTruck(
-        x,
-        8 - (row + 1) * level.rowSpacing + stagger,
+        spawn.x,
+        spawn.z,
         speed,
-        level.routes[column % level.routes.length],
-        x,
-        outside ? (column === 0 ? 0.09 : -0.09) : 0,
+        spawn.route,
+        spawn.offset,
+        spawn.yaw,
       );
     }
     this.world.step();
@@ -261,7 +260,7 @@ export class Simulation {
     let target = truck.route[truck.waypoint];
     let tx = target.x + truck.offset,
       tz = target.z;
-    if (
+    while (
       (Math.hypot(tx - pos.x, tz - pos.z) < 20 || passed()) &&
       truck.waypoint < truck.route.length - 1
     ) {

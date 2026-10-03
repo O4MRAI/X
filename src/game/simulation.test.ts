@@ -248,8 +248,8 @@ describe("authored campaign routes", () => {
         x: level.id === 9 ? 0.65 : 0,
       });
       if (level.id === 6 || level.id === 10) {
-        tick(s, level.id === 6 ? 100 : 150);
-        tick(s, level.id === 6 ? 30 : 26, {
+        tick(s, level.id === 6 ? 100 : 60);
+        tick(s, level.id === 6 ? 30 : 32, {
           ...idleInput(),
           z: -1,
           sprint: true,
@@ -288,6 +288,74 @@ describe("authored campaign routes", () => {
       s.dispose();
     },
   );
+});
+describe("convoy placement", () => {
+  it("starts every truck clear of other bodies and over solid road in all ten levels", () => {
+    for (const level of LEVELS) {
+      const s = new Simulation(level, { ...DEFAULT_SETTINGS });
+      const overlaps: string[] = [];
+      const unsupported: string[] = [];
+      for (const [handle, role] of s.roles) {
+        if (!role.truck) continue;
+        const collider = s.world.getCollider(handle);
+        s.world.contactPairsWith(collider, (other) => {
+          const target = s.roles.get(other.handle);
+          if (
+            !target ||
+            target.kind === "ground" ||
+            target.truck === role.truck
+          )
+            return;
+          s.world.contactPair(collider, other, (manifold) => {
+            for (let i = 0; i < manifold.numContacts(); i++)
+              if (manifold.contactDist(i) < -0.005)
+                overlaps.push(
+                  `${s.trucks.indexOf(role.truck!)}:${target.kind}`,
+                );
+          });
+        });
+      }
+      for (const [index, truck] of s.trucks.entries()) {
+        for (const x of [-1.35, 1.35]) {
+          for (const z of [-5.5, 0.2, 5.8]) {
+            const point = toWorld(v(x, 0.67, z), truck.body);
+            const hit = s.world.castRay(
+              new RAPIER.Ray(point, { x: 0, y: -1, z: 0 }),
+              2,
+              true,
+              undefined,
+              undefined,
+              undefined,
+              truck.body,
+              (c) => s.roles.get(c.handle)?.kind === "ground",
+            );
+            if (!hit) unsupported.push(`${index}:${x},${z}`);
+          }
+        }
+      }
+      s.dispose();
+      expect(overlaps, `level ${level.id}: overlapping spawn bodies`).toEqual(
+        [],
+      );
+      expect(unsupported, `level ${level.id}: wheels without road`).toEqual([]);
+    }
+  });
+  it("replays the same formation on retry, while a different seed changes outer groups", () => {
+    const positions = (seed: number) => {
+      const s = new Simulation({ ...LEVELS[0], seed }, { ...DEFAULT_SETTINGS });
+      const result = s.trucks.map((truck) => ({
+        position: { ...truck.body.translation() },
+        rotation: { ...truck.body.rotation() },
+      }));
+      s.dispose();
+      return result;
+    };
+    const initial = positions(LEVELS[0].seed);
+    expect(positions(LEVELS[0].seed)).toEqual(initial);
+    expect(positions(LEVELS[0].seed + 1).slice(1)).not.toEqual(
+      initial.slice(1),
+    );
+  });
 });
 describe("implemented abilities and physical vehicles", () => {
   it("dash adds one bounded impulse and does not create upward flight", () => {

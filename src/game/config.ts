@@ -1,3 +1,4 @@
+export const WORLD = { halfWidth: 256 } as const;
 export const MOVEMENT = {
   step: 1 / 60,
   maxSteps: 6,
