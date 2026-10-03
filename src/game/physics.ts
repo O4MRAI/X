@@ -5,7 +5,7 @@ import RAPIER, {
 import { Quaternion, Vector3 } from "three";
 import { MOVEMENT, WORLD, type Settings } from "./config";
 import { floorSegments, type Level, type Point, type Obstacle } from "./levels";
-import { createConvoy } from "./convoy";
+import { createConvoy, type TruckSpawn } from "./convoy";
 import { PlayerController } from "./player";
 import { type Controls } from "./input";
 import { v } from "./math";
@@ -57,6 +57,7 @@ export class Simulation {
   constructor(
     readonly level: Level,
     public settings: Settings,
+    readonly formation: readonly TruckSpawn[] = createConvoy(level),
   ) {
     this.world.timestep = MOVEMENT.step;
     this.world.integrationParameters.numSolverIterations = 6;
@@ -110,7 +111,6 @@ export class Simulation {
       { x: 32, z: -235 },
     ];
     this.addTruck(level.startX, 8, level.speed, starterRoute, level.startX);
-    const formation = createConvoy(level);
     for (let i = 1; i < level.truckCount; i++) {
       if (level.crossConvoy && i > level.truckCount - 7) {
         const row = i - (level.truckCount - 6),
@@ -128,7 +128,7 @@ export class Simulation {
         );
         continue;
       }
-      const spawn = formation[i - 1];
+      const spawn = this.formation[i - 1];
       const speed =
         level.speed + (this.random() - 0.5) * 2 * level.speedVariation;
       this.addTruck(

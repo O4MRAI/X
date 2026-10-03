@@ -290,6 +290,27 @@ describe("authored campaign routes", () => {
   );
 });
 describe("convoy placement", () => {
+  it("retains the exact starting formation after a real loss in every level", () => {
+    for (const level of LEVELS) {
+      const s = new Simulation(level, { ...DEFAULT_SETTINGS });
+      const layout = (sim: Simulation) =>
+        sim.trucks.map((truck) => ({
+          position: { ...truck.body.translation() },
+          rotation: { ...truck.body.rotation() },
+          speed: truck.speed,
+        }));
+      const before = layout(s);
+      tick(s, 180, { ...idleInput(), x: 1 });
+      expect(s.outcome, `level ${level.id}: real side fall`).toBe("failed");
+      const retry = new Simulation(s.level, s.settings, s.formation);
+      expect(retry.formation).toBe(s.formation);
+      expect(layout(retry), `level ${level.id}: retry placement`).toEqual(
+        before,
+      );
+      s.dispose();
+      retry.dispose();
+    }
+  });
   it("starts every truck clear of other bodies and over solid road in all ten levels", () => {
     for (const level of LEVELS) {
       const s = new Simulation(level, { ...DEFAULT_SETTINGS });

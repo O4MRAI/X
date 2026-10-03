@@ -19,18 +19,42 @@ const CACHE_PREFIX = ${JSON.stringify(cachePrefix)};
 const CACHE = CACHE_PREFIX + ${JSON.stringify(version)};
 const ASSETS = ${JSON.stringify(assets.map(file => `${base}${file}`))};
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS.map(asset => new Request(asset, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => (key.startsWith(CACHE_PREFIX) || key.startsWith('rooftop-rush-' + encodeURIComponent(BASE) + '-')) && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
+async function navigation(request) {
+  const cache = await caches.open(CACHE);
+  try {
+    const response = await fetch(new Request(request, { cache: 'no-cache' }));
+    if (!response.ok) throw new Error('Navigation unavailable');
+    if (response.headers.get('content-type')?.includes('text/html')) {
+      try { await cache.put(BASE + 'index.html', response.clone()); } catch {}
+    }
+    return response;
+  } catch {
+    return (await cache.match(BASE + 'index.html')) || Response.error();
+  }
+}
+async function asset(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request, { ignoreVary: true });
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      try { await cache.put(request, response.clone()); } catch {}
+    }
+    return response;
+  } catch {
+    return Response.error();
+  }
+}
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || !url.pathname.startsWith(BASE)) return;
-  event.respondWith(caches.match(event.request, { ignoreVary: true }).then(cached => cached || fetch(event.request).catch(() => {
-    if (event.request.mode === 'navigate') return caches.match(BASE + 'index.html', { ignoreVary: true });
-    return Response.error();
-  })));
+  event.respondWith(event.request.mode === 'navigate' ? navigation(event.request) : asset(event.request));
 });
 `);
 console.log(`Offline cache prepared at ${base}: ${assets.length} files.`);

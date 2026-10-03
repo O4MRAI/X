@@ -91,6 +91,11 @@ test("20 immediate keyboard retries, a single jump, side fall, and retry button"
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await loaded(page);
+  const initialUrl = page.url();
+  let navigations = 0;
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) navigations++;
+  });
   await page.getByRole("button", { name: "PLAY LEVEL", exact: true }).click();
   await page.waitForTimeout(600);
   const resources = (await snapshot(page))!;
@@ -114,6 +119,11 @@ test("20 immediate keyboard retries, a single jump, side fall, and retry button"
   await page.getByRole("button", { name: "RETRY LEVEL", exact: true }).click();
   await expect.poll(async () => (await snapshot(page))?.phase).toBe("Playing");
   expect((await snapshot(page))!.jumps).toBe(0);
+  expect((await snapshot(page))!.level).toBe(1);
+  expect((await snapshot(page))!.support).toBe(0);
+  expect((await snapshot(page))!.time).toBeLessThan(1);
+  expect(page.url()).toBe(initialUrl);
+  expect(navigations).toBe(0);
   expect(errors).toEqual([]);
 });
 test("settings recover from corruption; mouse look and lost capture pause correctly", async ({
@@ -302,6 +312,61 @@ test("production assets and physics work offline inside the site path", async ({
   ).toBeEnabled({ timeout: 20000 });
   await page.getByRole("button", { name: "PLAY LEVEL", exact: true }).click();
   await expect(page.locator(".crosshair")).toBeVisible();
+  await ctx.close();
+});
+test("online navigation replaces stale cached HTML and stays current offline", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await loaded(page, `http://localhost:4173${base}`);
+  await expect
+    .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+    .toBe(true);
+  const script = await page
+    .locator('script[type="module"]')
+    .getAttribute("src");
+  const foreignAsset = await page.evaluate(async (siteBase) => {
+    const cache = await caches.open("unrelated-old-release");
+    const url = `${siteBase}stale-asset-test.txt`;
+    await cache.put(url, new Response("STALE ASSET"));
+    return (await fetch(url)).text();
+  }, base);
+  expect(foreignAsset).not.toBe("STALE ASSET");
+  await page.evaluate(async (siteBase) => {
+    const keys = await caches.keys();
+    const key = keys.find((name) =>
+      name.startsWith(`convoy-leap-${encodeURIComponent(siteBase)}-`),
+    );
+    if (!key) throw new Error("Offline cache was not installed");
+    const cache = await caches.open(key);
+    await cache.put(
+      `${siteBase}index.html`,
+      new Response("<!doctype html><h1>STALE RELEASE</h1>", {
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+  }, base);
+  await loaded(page, `http://localhost:4173${base}index.html`);
+  await expect(page.locator('script[type="module"]')).toHaveAttribute(
+    "src",
+    script!,
+  );
+  await expect(
+    page.getByRole("heading", { name: "STALE RELEASE" }),
+  ).toHaveCount(0);
+  await ctx.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "PLAY LEVEL", exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator('script[type="module"]')).toHaveAttribute(
+    "src",
+    script!,
+  );
+  expect(errors).toEqual([]);
   await ctx.close();
 });
 test("mouse-capture rejection stays in the menu with a useful recovery message", async ({

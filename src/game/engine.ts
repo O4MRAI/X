@@ -115,11 +115,11 @@ export class GameEngine {
   retry() {
     const wasPlaying = this.phase === "Playing";
     this.audio.pause();
-    const level = this.sim.level.id,
+    const { level, formation } = this.sim,
       renderer = this.render.renderer;
     this.render.dispose(true);
     this.sim.dispose();
-    this.sim = new Simulation(LEVELS[level - 1], this.options.settings);
+    this.sim = new Simulation(level, this.options.settings, formation);
     this.render = new GameRenderer(
       this.host,
       this.sim,
