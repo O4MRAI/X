@@ -124,6 +124,16 @@ test("20 immediate keyboard retries, a single jump, side fall, and retry button"
   expect((await snapshot(page))!.time).toBeLessThan(1);
   expect(page.url()).toBe(initialUrl);
   expect(navigations).toBe(0);
+  expect((await snapshot(page))!.look.yaw).toBe(0);
+  await walkToEdge(page);
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(1100);
+  await page.keyboard.up("w");
+  await page.keyboard.up("Shift");
+  await expect
+    .poll(async () => (await snapshot(page))!.visited, { timeout: 10000 })
+    .toBeGreaterThan(1);
+  expect((await snapshot(page))!.phase).toBe("Playing");
   expect(errors).toEqual([]);
 });
 test("settings recover from corruption; mouse look and lost capture pause correctly", async ({
@@ -280,6 +290,35 @@ test("Android-sized portrait and landscape touch play", async ({ browser }) => {
   ).toHaveAttribute("aria-pressed", "false");
   expect((await snapshot(page))!.phase).toBe("Playing");
   await page.screenshot({ path: "/tmp/convoy-mobile-playing.png" });
+  const fallFinger = {
+    x: stick.x + stick.width / 2,
+    y: stick.y + stick.height / 2,
+    id: 1,
+  };
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [fallFinger],
+  });
+  fallFinger.x += 40;
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [fallFinger],
+  });
+  await expect(
+    page.getByRole("button", { name: "RETRY LEVEL", exact: true }),
+  ).toBeVisible();
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await page.getByRole("button", { name: "RETRY LEVEL", exact: true }).tap();
+  await expect.poll(async () => (await snapshot(page))?.phase).toBe("Playing");
+  expect((await snapshot(page))!.support).toBe(0);
+  expect((await snapshot(page))!.time).toBeLessThan(1);
+  expect((await snapshot(page))!.look.yaw).toBe(0);
+  await expect(
+    page.getByRole("button", { name: "Sprint", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
   expect(errors).toEqual([]);
   await ctx.close();
 });

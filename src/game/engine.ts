@@ -130,7 +130,10 @@ export class GameEngine {
     this.clock.reset();
     this.pending = idleInput();
     this.jumps = this.landings = this.crashes = this.steps = 0;
+    // Draw/upload the restored convoy before resuming the simulation clock.
+    this.render.render(1, this.input.yaw, this.input.pitch, false);
     this.previousTime = performance.now();
+    this.lastRender = this.previousTime;
     this.phase = wasPlaying ? "Playing" : "Paused";
     if (wasPlaying) this.audio.activate(this.options.settings.volume);
     this.notify();
