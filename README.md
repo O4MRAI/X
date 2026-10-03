@@ -15,7 +15,7 @@ npm ci --include=dev
 npm run dev -- --port 5173 --strictPort
 ```
 
-Open `http://localhost:5173/`. Click **Play level** to capture the mouse and activate audio. Desktop Chrome is the primary tested browser. On touch devices, use the left joystick, drag the right side to look, tap Jump, and hold Sprint; landscape is recommended. The mobile controls were checked with Android-sized Chromium emulation, not physical Android hardware. This is a browser/PWA game, not an APK.
+Open `http://localhost:5173/`. Click **Play level** to capture the mouse and activate audio. Desktop Chrome is the primary tested browser. On touch devices, use the left joystick, drag the right side to look, tap Jump, and push the stick fully to sprint (the held Sprint button also works); landscape is recommended. The mobile controls were checked with Android-sized Chromium emulation, not physical Android hardware. This is a browser/PWA game, not an APK.
 
 | Input | Action |
 | --- | --- |
@@ -60,7 +60,7 @@ npm run test:browser
 
 The **36 simulation/save checks** cover ten-second roof carry, failure when walking across the open truck gap, turning support, exactly-once momentum inheritance, different-speed landings, diagonal normalization, coyote time, jump buffering, side contact, limited air jumps, physical ground/finish triggers, twenty world resets, fixed-step agreement at 30/60/144 rendering Hz, slow motion, dash, grapple and blocked line of sight, airborne/overturned vehicles, impulse response, corruption recovery, and unlocks. All ten levels have deterministic finish-reaching input sequences using basic movement, sprint jumps, and actual transfers, with no teleporting in those playthroughs. These establish reachable routes, not exhaustive collision or difficulty guarantees.
 
-Playwright checks real keyboard tutorial completion and saved unlocks; pause/resume; twenty immediate retries and bounded GPU/body resources; settings and mouse capture; touch play in portrait/landscape; production offline play; pointer-lock rejection; and unavailable WebGL. Its development-only `window.__CONVOY__()` reads diagnostics and has no gameplay mutation methods. The production build omits that hook. The published HTTPS site also passed browser startup, mouse capture, pause, and service-worker activation with no page errors.
+Playwright checks real keyboard tutorial completion and saved unlocks; pause/resume; twenty immediate retries and bounded GPU/body resources; settings and mouse capture; touch play in portrait/landscape and an actual two-finger sprint jump across the wider gap; production offline play; pointer-lock rejection; and unavailable WebGL. Its development-only `window.__CONVOY__()` reads diagnostics and has no gameplay mutation methods. The production build omits that hook. The published HTTPS site also passed browser startup, mouse capture, pause, and service-worker activation with no page errors.
 
 Browser tests use `/usr/bin/chromium`; override `CHROMIUM_PATH` if needed. They start/reuse Vite on 5173 and the production preview on 4173. Build before running them. Screenshots are written to `/tmp/convoy-*.png`.
 

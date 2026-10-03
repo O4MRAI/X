@@ -1,5 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import { type GameEngine } from "./engine";
 import { type Settings } from "./config";
 export default function TouchControls({
@@ -11,9 +11,26 @@ export default function TouchControls({
 }) {
   const origin = useRef({ x: 0, y: 0 }),
     look = useRef({ x: 0, y: 0 }),
+    sprintSources = useRef({ stick: false, button: false }),
+    [sprinting, setSprinting] = useState(false),
     [stick, setStick] = useState({ x: 0, y: 0 });
   if (!matchMedia("(pointer: coarse)").matches) return null;
+  const releaseLook = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+  const syncSprint = () => {
+    const active = sprintSources.current.stick || sprintSources.current.button;
+    getEngine()?.touchAction("sprint", active);
+    setSprinting(active);
+  };
+  const releaseSprintButton = () => {
+    sprintSources.current.button = false;
+    syncSprint();
+  };
   const reset = () => {
+    sprintSources.current.stick = false;
+    syncSprint();
     getEngine()?.touchMove(0, 0);
     setStick({ x: 0, y: 0 });
   };
@@ -22,6 +39,8 @@ export default function TouchControls({
       <div
         className="look-pad"
         aria-label="Drag to look"
+        onPointerUp={releaseLook}
+        onPointerCancel={releaseLook}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           look.current = { x: e.clientX, y: e.clientY };
@@ -47,6 +66,9 @@ export default function TouchControls({
           let x = (e.clientX - origin.current.x) / 40,
             y = (e.clientY - origin.current.y) / 40;
           const n = Math.hypot(x, y);
+          // Full stick travel enables sprint so moving + jumping needs two thumbs.
+          sprintSources.current.stick = n >= 0.85;
+          syncSprint();
           if (n > 1) {
             x /= n;
             y /= n;
@@ -63,12 +85,15 @@ export default function TouchControls({
       <div className="touch-buttons">
         <button
           aria-label="Sprint"
+          aria-pressed={sprinting}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
-            getEngine()?.touchAction("sprint");
+            sprintSources.current.button = true;
+            syncSprint();
           }}
-          onPointerUp={() => getEngine()?.touchAction("sprint", false)}
-          onPointerCancel={() => getEngine()?.touchAction("sprint", false)}
+          onPointerUp={releaseSprintButton}
+          onPointerCancel={releaseSprintButton}
+          onLostPointerCapture={releaseSprintButton}
         >
           SPRINT
         </button>

@@ -133,6 +133,12 @@ export default function App() {
             <button
               className="icon-button"
               aria-label="Pause game"
+              onPointerDown={(e) => {
+                if (e.pointerType === "touch") {
+                  e.preventDefault();
+                  engine.current?.pause();
+                }
+              }}
               onClick={() => engine.current?.pause()}
             >
               <Pause size={18} />
@@ -153,7 +159,7 @@ export default function App() {
           </button>
           <div className="start-controls">
             {touch
-              ? "Left stick move · Drag right look · Tap Jump"
+              ? "Left stick move/sprint · Drag right look · Jump"
               : "WASD move · Mouse look · Space jump · Shift sprint"}
           </div>
           <div className="menu-actions">
@@ -217,7 +223,7 @@ export default function App() {
               Sprint toward the edge, then jump to another roof.
               <small>
                 {touch
-                  ? "Left stick move · Drag right look · Jump to leap"
+                  ? "Full stick to sprint · Drag right to look · Jump to leap"
                   : "WASD move · Mouse look · Space jump · Shift sprint · R retry"}
               </small>
             </div>
@@ -354,7 +360,7 @@ export default function App() {
                   <div className="touch-guide">
                     Left stick to move · Drag right to look
                     <br />
-                    Jump to leap · Hold Sprint for distance
+                    Full stick to sprint · Jump to leap
                     <br />
                     Landscape recommended
                   </div>

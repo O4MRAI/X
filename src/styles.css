@@ -44,6 +44,7 @@ button {
   width: 100%;
   height: 100%;
   isolation: isolate;
+  touch-action: none;
 }
 .game-canvas {
   position: absolute;
@@ -853,4 +854,9 @@ kbd {
   .start-prompt .primary-button {
     padding: 10px 16px;
   }
+}
+
+.touch-buttons button[aria-pressed="true"] {
+  background: #e7f0fada;
+  color: #233e5e;
 }

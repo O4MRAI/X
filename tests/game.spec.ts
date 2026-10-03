@@ -207,6 +207,68 @@ test("Android-sized portrait and landscape touch play", async ({ browser }) => {
     touchPoints: [],
   });
   expect((await snapshot(page))!.look.yaw).not.toBe(before);
+  expect(await page.evaluate(() => visualViewport!.scale)).toBe(1);
+  await expect
+    .poll(() =>
+      page.getByLabel("Drag to look").evaluate((el) => el.matches(":active")),
+    )
+    .toBe(false);
+  await page.getByRole("button", { name: "Pause game" }).tap();
+  await expect(
+    page.getByRole("button", { name: "RESUME", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Restart level" }).tap();
+  await expect
+    .poll(async () => (await snapshot(page))?.simulationTime)
+    .toBeLessThan(0.3);
+  const stick = (await page.getByLabel("Move joystick").boundingBox())!;
+  const jump = (await page
+    .getByRole("button", { name: "Jump", exact: true })
+    .boundingBox())!;
+  const finger = {
+    x: stick.x + stick.width / 2,
+    y: stick.y + stick.height / 2,
+    id: 1,
+  };
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [finger],
+  });
+  finger.y -= 40;
+  const began = (await snapshot(page))!.simulationTime;
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [finger],
+  });
+  await expect(
+    page.getByRole("button", { name: "Sprint", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(async () => (await snapshot(page))!.simulationTime - began, {
+      intervals: [20],
+    })
+    .toBeGreaterThan(0.4);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      finger,
+      { x: jump.x + jump.width / 2, y: jump.y + jump.height / 2, id: 2 },
+    ],
+  });
+  await expect
+    .poll(async () => (await snapshot(page))!.visited, {
+      intervals: [30],
+      timeout: 10000,
+    })
+    .toBeGreaterThan(1);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(
+    page.getByRole("button", { name: "Sprint", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  expect((await snapshot(page))!.phase).toBe("Playing");
   await page.screenshot({ path: "/tmp/convoy-mobile-playing.png" });
   expect(errors).toEqual([]);
   await ctx.close();
