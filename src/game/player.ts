@@ -26,6 +26,7 @@ export class PlayerController {
   jumpBuffer = 0;
   airJumpUsed = false;
   jumps = 0;
+  jumping = false;
   landings = 0;
   visited = new Set<number>();
   lastLandSpeed = 0;
@@ -161,6 +162,7 @@ export class PlayerController {
     }
   }
   private detach() {
+    this.jumping = false;
     if (this.support) {
       surfaceVelocity(
         this.support.body,
@@ -195,6 +197,7 @@ export class PlayerController {
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.jumps++;
+    this.jumping = true;
     if (double) this.airJumpUsed = true;
   }
   step(input: Controls, dt: number) {
@@ -338,6 +341,7 @@ export class PlayerController {
           .clampLength(0, MOVEMENT.sprint);
       }
       this.grounded = true;
+      this.jumping = false;
       this.support = landing.truck;
       this.supportNormal.copy(landing.normal);
       this.worldVelocity.y = 0;

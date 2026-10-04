@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { MOVEMENT, WORLD, type Settings } from "./config";
+import { MOVEMENT, WORLD, FINISH, type Settings } from "./config";
 import { type Simulation } from "./physics";
 import { floorSegments } from "./levels";
 import { v } from "./math";
@@ -240,6 +240,30 @@ export class GameRenderer {
       this.box(0.5, 10, 0.6, 0x855b65, x, 5, -l.length);
       this.box(1.1, 0.6, 1.2, 0xffdce3, x, 10, -l.length);
     }
+    const gateY = l.finishY + FINISH.rise;
+    for (const y of [gateY - FINISH.halfHeight, gateY + FINISH.halfHeight])
+      this.box(
+        FINISH.halfWidth * 2,
+        0.12,
+        0.16,
+        0xe1f5ff,
+        l.finishX,
+        y,
+        -l.length,
+      );
+    const target = this.box(
+      FINISH.halfWidth * 2,
+      FINISH.halfHeight * 2,
+      0.04,
+      0xc5e8ff,
+      l.finishX,
+      gateY,
+      -l.length,
+    );
+    const targetMaterial = target.material as THREE.Material;
+    targetMaterial.transparent = true;
+    targetMaterial.opacity = 0.14;
+    targetMaterial.depthWrite = false;
     const banner = this.box(22, 1.2, 0.4, 0xac596c, l.finishX, 9.3, -l.length);
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
@@ -248,9 +272,9 @@ export class GameRenderer {
     c.fillStyle = "#ac596c";
     c.fillRect(0, 0, 1024, 128);
     c.fillStyle = "#ffffff";
-    c.font = "bold 70px sans-serif";
+    c.font = "bold 56px sans-serif";
     c.textAlign = "center";
-    c.fillText("FINISH", 512, 92);
+    c.fillText("JUMP TO FINISH", 512, 90);
     const texture = new THREE.CanvasTexture(canvas);
     banner.material = this.material(0xffffff);
     (banner.material as THREE.MeshStandardMaterial).map = texture;

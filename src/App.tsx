@@ -217,17 +217,21 @@ export default function App() {
               )}
             </div>
           )}
-          {settings.hints && (state?.time || 0) < 5 && (
-            <div className="playing-hint">
-              <span className="hint-dot" />
-              Sprint toward the edge, then jump to another roof.
-              <small>
-                {touch
-                  ? "Full stick to sprint · Drag right to look · Jump to leap"
-                  : "WASD move · Mouse look · Space jump · Shift sprint · R retry"}
-              </small>
-            </div>
-          )}
+          {settings.hints &&
+            ((state?.time || 0) < 5 ||
+              state!.position.z < -level.length + 45) && (
+              <div className="playing-hint">
+                <span className="hint-dot" />
+                {state!.position.z < -level.length + 45
+                  ? "Jump through the raised finish gate. Riding underneath won't finish."
+                  : "Sprint to another roof, then jump through the finish gate."}
+                <small>
+                  {touch
+                    ? "Full stick to sprint · Drag right to look · Jump to leap"
+                    : "WASD move · Mouse look · Space jump · Shift sprint · R retry"}
+                </small>
+              </div>
+            )}
         </>
       )}
       {!playing && !entry && (

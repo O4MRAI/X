@@ -97,7 +97,7 @@ describe("first-person moving platform foundation", () => {
     expect(s.player.jumps).toBe(2);
     s.dispose();
   });
-  it("requires actual finish overlap, and kills contact with the road", () => {
+  it("kills road contact and rejects standing or falling through the finish", () => {
     const s = fixture();
     tick(s, 1);
     expect(s.outcome).toBeNull();
@@ -108,7 +108,10 @@ describe("first-person moving platform foundation", () => {
     const f = fixture();
     placePlayer(f, v(0, 5, -f.level.length));
     tick(f, 1);
-    expect(f.outcome).toBe("completed");
+    expect(f.outcome).toBeNull();
+    placePlayer(f, v(0, 7.6, -f.level.length));
+    tick(f, 1);
+    expect(f.outcome).toBeNull();
     f.dispose();
   });
   it("keeps simulation time separate from active time during slow motion", () => {
@@ -134,16 +137,31 @@ describe("first-person moving platform foundation", () => {
   });
 });
 describe("tutorial playability", () => {
-  it("can finish level one through an actual truck transfer in basic mode", () => {
+  it("can finish through a truck transfer and a separate final jump in basic mode", () => {
     const s = new Simulation(LEVELS[0], { ...DEFAULT_SETTINGS });
     tick(s, 26, { ...idleInput(), z: -1, sprint: true });
     tick(s, 1, { ...idleInput(), z: -1, sprint: true, jump: true });
     tick(s, 65, { ...idleInput(), z: -1, sprint: true });
-    tick(s, 2400);
+    for (let i = 0; i < 2400 && !s.outcome; i++)
+      tick(s, 1, {
+        ...idleInput(),
+        jump: s.player.grounded && s.player.position.z < -s.level.length + 12,
+      });
     expect(s.player.visited.size).toBeGreaterThan(1);
     expect(s.outcome).toBe("completed");
     expect(s.activeTime).toBeGreaterThan(20);
     expect(s.activeTime).toBeLessThan(60);
+    s.dispose();
+  });
+  it("cannot ride the next truck through the finish without a final jump", () => {
+    const s = new Simulation(LEVELS[0], { ...DEFAULT_SETTINGS });
+    tick(s, 26, { ...idleInput(), z: -1, sprint: true });
+    tick(s, 1, { ...idleInput(), z: -1, sprint: true, jump: true });
+    tick(s, 65, { ...idleInput(), z: -1, sprint: true });
+    expect(s.player.visited.size).toBeGreaterThan(1);
+    tick(s, 3000);
+    expect(s.outcome).toBe("failed");
+    expect(s.reason).toContain("Jump through the raised gate");
     s.dispose();
   });
   it("cannot walk across the open gap to the next truck", () => {
@@ -248,8 +266,8 @@ describe("authored campaign routes", () => {
         x: level.id === 9 ? 0.65 : 0,
       });
       if (level.id === 6 || level.id === 10) {
-        tick(s, level.id === 6 ? 100 : 60);
-        tick(s, level.id === 6 ? 30 : 32, {
+        tick(s, 100);
+        tick(s, level.id === 6 ? 30 : 26, {
           ...idleInput(),
           z: -1,
           sprint: true,
@@ -278,7 +296,11 @@ describe("authored campaign routes", () => {
                 sprint: true,
                 jump: s.player.grounded,
               }
-            : idleInput(),
+            : {
+                ...idleInput(),
+                jump:
+                  s.player.grounded && s.player.position.z < -level.length + 12,
+              },
         );
       }
 

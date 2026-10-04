@@ -51,11 +51,20 @@ test("real keyboard transfer, paused clocks, real finish, and persistent unlock"
   expect((await snapshot(page))!.time).toBe(paused!.time);
   expect((await snapshot(page))!.position).toEqual(paused!.position);
   await page.getByRole("button", { name: "RESUME", exact: true }).click();
+  await expect
+    .poll(async () => (await snapshot(page))!.position.z, {
+      intervals: [25],
+      timeout: 80000,
+    })
+    .toBeLessThan(-426);
+  expect((await snapshot(page))!.phase).toBe("Playing");
+  await page.keyboard.press("Space");
   await expect(
     page.getByRole("heading", { name: "Perfect landing." }),
   ).toBeVisible({ timeout: 80000 });
   const result = (await snapshot(page))!;
   expect(result.visited).toBeGreaterThan(1);
+  expect(result.jumps).toBeGreaterThan(1);
   expect(result.time).toBeLessThan(70);
   expect(result.position.z).toBeLessThan(-438);
   await page.screenshot({ path: "/tmp/convoy-completed.png" });
@@ -83,6 +92,34 @@ test("real keyboard transfer, paused clocks, real finish, and persistent unlock"
     page.getByRole("button", { name: /03 Passing lane/ }),
   ).toBeDisabled();
   expect(errors).toEqual([]);
+});
+test("standing on the next truck cannot win or unlock a level", async ({
+  page,
+}) => {
+  test.setTimeout(100000);
+  await loaded(page);
+  await page.getByRole("button", { name: "PLAY LEVEL", exact: true }).click();
+  await walkToEdge(page);
+  await page.keyboard.press("Space");
+  await expect
+    .poll(async () => (await snapshot(page))!.visited, {
+      intervals: [30],
+      timeout: 15000,
+    })
+    .toBeGreaterThan(1);
+  await page.keyboard.up("w");
+  await page.keyboard.up("Shift");
+  await expect(
+    page.getByRole("button", { name: "RETRY LEVEL", exact: true }),
+  ).toBeVisible({ timeout: 80000 });
+  const result = (await snapshot(page))!;
+  expect(result.phase).toBe("Failed");
+  expect(result.reason).toContain("Jump through the raised gate");
+  expect(result.jumps).toBe(1);
+  expect(result.visited).toBeGreaterThan(1);
+  expect(
+    await page.evaluate(() => localStorage.getItem("convoy-leap-progress")),
+  ).toBeNull();
 });
 test("20 immediate keyboard retries, a single jump, side fall, and retry button", async ({
   page,
@@ -178,6 +215,7 @@ test("settings recover from corruption; mouse look and lost capture pause correc
   ).toBe(75);
 });
 test("Android-sized portrait and landscape touch play", async ({ browser }) => {
+  test.setTimeout(100000);
   const ctx = await browser.newContext({
     viewport: { width: 393, height: 852 },
     deviceScaleFactor: 2,
@@ -245,49 +283,52 @@ test("Android-sized portrait and landscape touch play", async ({ browser }) => {
   const jump = (await page
     .getByRole("button", { name: "Jump", exact: true })
     .boundingBox())!;
-  const finger = {
-    x: stick.x + stick.width / 2,
-    y: stick.y + stick.height / 2,
-    id: 1,
+  const transfer = async () => {
+    const finger = {
+      x: stick.x + stick.width / 2,
+      y: stick.y + stick.height / 2,
+      id: 1,
+    };
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [finger],
+    });
+    finger.y -= 40;
+    const began = (await snapshot(page))!.simulationTime;
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [finger],
+    });
+    await expect(
+      page.getByRole("button", { name: "Sprint", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect
+      .poll(async () => (await snapshot(page))!.simulationTime - began, {
+        intervals: [20],
+      })
+      .toBeGreaterThan(0.4);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [
+        finger,
+        { x: jump.x + jump.width / 2, y: jump.y + jump.height / 2, id: 2 },
+      ],
+    });
+    await expect
+      .poll(async () => (await snapshot(page))!.visited, {
+        intervals: [30],
+        timeout: 10000,
+      })
+      .toBeGreaterThan(1);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect(
+      page.getByRole("button", { name: "Sprint", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
   };
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [finger],
-  });
-  finger.y -= 40;
-  const began = (await snapshot(page))!.simulationTime;
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [finger],
-  });
-  await expect(
-    page.getByRole("button", { name: "Sprint", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect
-    .poll(async () => (await snapshot(page))!.simulationTime - began, {
-      intervals: [20],
-    })
-    .toBeGreaterThan(0.4);
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [
-      finger,
-      { x: jump.x + jump.width / 2, y: jump.y + jump.height / 2, id: 2 },
-    ],
-  });
-  await expect
-    .poll(async () => (await snapshot(page))!.visited, {
-      intervals: [30],
-      timeout: 10000,
-    })
-    .toBeGreaterThan(1);
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchEnd",
-    touchPoints: [],
-  });
-  await expect(
-    page.getByRole("button", { name: "Sprint", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
+  await transfer();
   expect((await snapshot(page))!.phase).toBe("Playing");
   await page.screenshot({ path: "/tmp/convoy-mobile-playing.png" });
   const fallFinger = {
@@ -319,6 +360,20 @@ test("Android-sized portrait and landscape touch play", async ({ browser }) => {
   await expect(
     page.getByRole("button", { name: "Sprint", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
+  await transfer();
+  await expect
+    .poll(async () => (await snapshot(page))!.position.z, {
+      intervals: [25],
+      timeout: 80000,
+    })
+    .toBeLessThan(-426);
+  expect((await snapshot(page))!.phase).toBe("Playing");
+  await page.getByRole("button", { name: "Jump", exact: true }).tap();
+  await expect(
+    page.getByRole("heading", { name: "Perfect landing." }),
+  ).toBeVisible({ timeout: 10000 });
+  expect((await snapshot(page))!.jumps).toBeGreaterThan(1);
+  await page.screenshot({ path: "/tmp/convoy-mobile-completed.png" });
   expect(errors).toEqual([]);
   await ctx.close();
 });

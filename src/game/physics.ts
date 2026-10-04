@@ -3,7 +3,7 @@ import RAPIER, {
   type RigidBody,
 } from "@dimforge/rapier3d-compat";
 import { Quaternion, Vector3 } from "three";
-import { MOVEMENT, WORLD, type Settings } from "./config";
+import { MOVEMENT, WORLD, FINISH, type Settings } from "./config";
 import { floorSegments, type Level, type Point, type Obstacle } from "./levels";
 import { createConvoy, type TruckSpawn } from "./convoy";
 import { PlayerController } from "./player";
@@ -145,12 +145,16 @@ export class Simulation {
     const finishBody = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(
         level.finishX,
-        level.finishY + 1,
+        level.finishY + FINISH.rise,
         -level.length,
       ),
     );
     this.finish = this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(11, 4, 1.5).setSensor(true),
+      RAPIER.ColliderDesc.cuboid(
+        FINISH.halfWidth,
+        FINISH.halfHeight,
+        FINISH.halfDepth,
+      ).setSensor(true),
       finishBody,
     );
     this.roles.set(this.finish.handle, { kind: "finish" });
@@ -387,7 +391,12 @@ export class Simulation {
           this.fail("A barrier caught you. Read its timing and change roofs.");
           return false;
         }
-        if (role?.kind === "finish") {
+        if (
+          role?.kind === "finish" &&
+          !this.player.grounded &&
+          this.player.jumping &&
+          this.player.visited.size > 1
+        ) {
           this.outcome = "completed";
           return false;
         }
@@ -402,6 +411,8 @@ export class Simulation {
         return kind === "finish" || kind === "lethal";
       },
     );
+    if (!this.outcome && this.player.position.z < -this.level.length - 10)
+      this.fail("You passed the finish. Jump through the raised gate.");
   }
   fail(reason: string) {
     if (!this.outcome) {
